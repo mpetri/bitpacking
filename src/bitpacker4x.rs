@@ -278,6 +278,12 @@ impl BitPacker for BitPacker4x {
                 return BitPacker4x(InstructionSet::SSE3);
             }
         }
+        #[cfg(target_arch = "aarch64")]
+        {
+            if neon::UnsafeBitPackerImpl::available() {
+                return BitPacker4x(InstructionSet::Neon);
+            }
+        }
         BitPacker4x(InstructionSet::Scalar)
     }
 
@@ -287,6 +293,10 @@ impl BitPacker for BitPacker4x {
                 #[cfg(target_arch = "x86_64")]
                 InstructionSet::SSE3 => {
                     sse3::UnsafeBitPackerImpl::compress(decompressed, compressed, num_bits)
+                }
+                #[cfg(target_arch = "aarch64")]
+                InstructionSet::Neon => {
+                    neon::UnsafeBitPackerImpl::compress(decompressed, compressed, num_bits)
                 }
                 InstructionSet::Scalar => {
                     scalar::UnsafeBitPackerImpl::compress(decompressed, compressed, num_bits)
@@ -311,6 +321,13 @@ impl BitPacker for BitPacker4x {
                     compressed,
                     num_bits,
                 ),
+                #[cfg(target_arch = "aarch64")]
+                InstructionSet::Neon => neon::UnsafeBitPackerImpl::compress_sorted(
+                    initial,
+                    decompressed,
+                    compressed,
+                    num_bits,
+                ),
                 InstructionSet::Scalar => scalar::UnsafeBitPackerImpl::compress_sorted(
                     initial,
                     decompressed,
@@ -327,6 +344,10 @@ impl BitPacker for BitPacker4x {
                 #[cfg(target_arch = "x86_64")]
                 InstructionSet::SSE3 => {
                     sse3::UnsafeBitPackerImpl::decompress(compressed, decompressed, num_bits)
+                }
+                #[cfg(target_arch = "aarch64")]
+                InstructionSet::Neon => {
+                    neon::UnsafeBitPackerImpl::decompress(compressed, decompressed, num_bits)
                 }
                 InstructionSet::Scalar => {
                     scalar::UnsafeBitPackerImpl::decompress(compressed, decompressed, num_bits)
@@ -351,6 +372,13 @@ impl BitPacker for BitPacker4x {
                     decompressed,
                     num_bits,
                 ),
+                #[cfg(target_arch = "aarch64")]
+                InstructionSet::Neon => neon::UnsafeBitPackerImpl::decompress_sorted(
+                    initial,
+                    compressed,
+                    decompressed,
+                    num_bits,
+                ),
                 InstructionSet::Scalar => scalar::UnsafeBitPackerImpl::decompress_sorted(
                     initial,
                     compressed,
@@ -366,6 +394,8 @@ impl BitPacker for BitPacker4x {
             match self.0 {
                 #[cfg(target_arch = "x86_64")]
                 InstructionSet::SSE3 => sse3::UnsafeBitPackerImpl::num_bits(decompressed),
+                #[cfg(target_arch = "aarch64")]
+                InstructionSet::Neon => neon::UnsafeBitPackerImpl::num_bits(decompressed),
                 InstructionSet::Scalar => scalar::UnsafeBitPackerImpl::num_bits(decompressed),
             }
         }
@@ -378,6 +408,10 @@ impl BitPacker for BitPacker4x {
                 InstructionSet::SSE3 => {
                     sse3::UnsafeBitPackerImpl::num_bits_sorted(initial, decompressed)
                 }
+                #[cfg(target_arch = "aarch64")]
+                InstructionSet::Neon => {
+                    neon::UnsafeBitPackerImpl::num_bits_sorted(initial, decompressed)
+                }
                 InstructionSet::Scalar => {
                     scalar::UnsafeBitPackerImpl::num_bits_sorted(initial, decompressed)
                 }
@@ -386,7 +420,6 @@ impl BitPacker for BitPacker4x {
     }
 }
 
-#[cfg(target_arch = "x86_64")]
 #[cfg(test)]
 mod tests {
     use super::BLOCK_LEN;
@@ -395,10 +428,21 @@ mod tests {
     use crate::Available;
     use crate::{BitPacker, BitPacker4x};
 
+    #[cfg(target_arch = "x86_64")]
     #[test]
-    fn test_compatible() {
+    fn test_compatible_sse3() {
         if sse3::UnsafeBitPackerImpl::available() {
             test_util_compatible::<scalar::UnsafeBitPackerImpl, sse3::UnsafeBitPackerImpl>(
+                BLOCK_LEN,
+            );
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[test]
+    fn test_compatible_neon() {
+        if neon::UnsafeBitPackerImpl::available() {
+            test_util_compatible::<scalar::UnsafeBitPackerImpl, neon::UnsafeBitPackerImpl>(
                 BLOCK_LEN,
             );
         }
