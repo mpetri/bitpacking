@@ -5,6 +5,103 @@ use crate::Available;
 
 const BLOCK_LEN: usize = 32 * 4;
 
+#[cfg(any(target_arch = "aarch64"))]
+mod neon {
+
+    use super::BLOCK_LEN;
+    use crate::Available;
+
+    use std::arch::aarch64::uint32x4_t as DataType;
+    use std::arch::aarch64::vaddq_u32;
+    use std::arch::aarch64::vandq_u32;
+    use std::arch::aarch64::vdupq_n_s32;
+    use std::arch::aarch64::vdupq_n_u32;
+    use std::arch::aarch64::vld1q_u32;
+    use std::arch::aarch64::vorrq_u32;
+    use std::arch::aarch64::vshlq_u32;
+    use std::arch::aarch64::vst1q_u32;
+    use std::arch::aarch64::vsubq_u32;
+
+    #[allow(non_snake_case)]
+    #[inline]
+    unsafe fn left_shift_32(el: DataType, shift: i32) -> DataType {
+        vshlq_u32(a, vdupq_n_s32(-(imm)))
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    unsafe fn right_shift_32(el: DataType, shift: i32) -> DataType {
+        vshlq_u32(a, vdupq_n_u32(imm))
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    unsafe fn set1(el: i32) -> DataType {
+        vdupq_n_u32(el as u32)
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    unsafe fn op_and(a: DataType, b: DataType) -> DataType {
+        vandq_u32(a, b)
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    unsafe fn op_or(a: DataType, b: DataType) -> DataType {
+        vorrq_u32(a, b)
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    unsafe fn load_unaligned(p: *const DataType) -> DataType {
+        vld1q_u32(p)
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    unsafe fn store_unaligned(addr: *mut DataType, data: DataType) {
+        vst1q_u32(addr as (*mut u32), data)
+    }
+
+    #[allow(non_snake_case)]
+    #[inline]
+    unsafe fn or_collapse_to_u32(accumulator: DataType) -> u32 {
+        let a__b__c__d_ = accumulator;
+        let ______a__b_ = vshrq_n_u32(a__b__c__d_, 8);
+        let a__b__ca_db = op_or(a__b__c__d_, ______a__b_);
+        let ___a__b__ca = vshrq_n_u32(a__b__ca_db, 4);
+        let _______cadb = op_or(a__b__ca_db, ___a__b__ca);
+        vgetq_lane_u32(_______cadb, 0)
+    }
+
+    #[target_feature(enable = "neon")]
+    unsafe fn compute_delta(curr: DataType, prev: DataType) -> DataType {
+        vsubq_u32(curr, op_or(vshlq_n_u32(curr, 4), vshlq_n_u32(curr, 12)))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[allow(non_snake_case)]
+    #[inline]
+    unsafe fn integrate_delta(prev: DataType, delta: DataType) -> DataType {
+        let offset = vdupq_n_s32(prev, uint32x4_t[3]);
+        let a__b__c__d_ = delta;
+        let ______a__b_ = vshlq_n_u32(delta, 8);
+        let a__b__ca_db = vaddq_u32(______a__b_, a__b__c__d_);
+        let ___a__b__ca = vshlq_n_u32(a__b__ca_db, 4);
+        let a_ab_abc_abcd: DataType = vaddq_u32(___a__b__ca, a__b__ca_db);
+        vaddq_u32(offset, a_ab_abc_abcd)
+    }
+
+    declare_bitpacker!(target_feature(enable = "neon"));
+
+    impl Available for UnsafeBitPackerImpl {
+        fn available() -> bool {
+            is_aarch64_feature_detected!("neon")
+        }
+    }
+}
+
 #[cfg(any(target_arch = "x86_64"))]
 mod sse3 {
 
