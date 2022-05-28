@@ -19,19 +19,20 @@ mod neon {
     use std::arch::aarch64::vld1q_u32;
     use std::arch::aarch64::vorrq_u32;
     use std::arch::aarch64::vshlq_u32;
+    use std::arch::aarch64::vshrq_u32;
     use std::arch::aarch64::vst1q_u32;
     use std::arch::aarch64::vsubq_u32;
 
     #[allow(non_snake_case)]
     #[inline]
     unsafe fn left_shift_32(el: DataType, shift: i32) -> DataType {
-        vshlq_u32(a, vdupq_n_s32(-(imm)))
+        vshlq_u32(a, vdupq_n_s32(imm))
     }
 
     #[allow(non_snake_case)]
     #[inline]
     unsafe fn right_shift_32(el: DataType, shift: i32) -> DataType {
-        vshlq_u32(a, vdupq_n_u32(imm))
+        vshrq_u32(a, vdupq_n_u32(imm))
     }
 
     #[allow(non_snake_case)]
